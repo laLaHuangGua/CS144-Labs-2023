@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <cstdint>
 
 class Reader;
 class Writer;
