@@ -11,11 +11,13 @@ void get_URL( const string& host, const string& path )
 {
   TCPSocket socket{};
   socket.connect( { host, "http" } );
-  socket.write( move( "GET " + path + " HTTP/1.1\r\n" + "Host: " + host + "\r\n" + "Connection: close\r\n\r\n" ) );
-  while ( !socket.eof() ) {
-    string buffer{};
-    socket.read(buffer);
-    cout << buffer;
+  socket.write( "GET " + path + " HTTP/1.1\r\n" );
+  socket.write( "Host: " + host + "\r\n" );
+  socket.write( "Connection: close\r\n\r\n" );
+  while (!socket.eof()) {
+      string buffer{};
+      socket.read(buffer);
+      cout << buffer;
   }
   socket.close();
   // cerr << "Function called: get_URL(" << host << ", " << path << ")\n";
