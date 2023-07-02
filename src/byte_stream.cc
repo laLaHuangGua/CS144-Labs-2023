@@ -12,7 +12,7 @@ void Writer::push( string data )
     const uint64_t space = min( available_capacity(), data.size() );
     uint64_t i = 0;
     while ( i < space ) {
-      stream_.push_back( data[i] );
+      stream_.emplace( data[i] );
       i++;
     }
     bytes_pushed_ += i;
@@ -46,7 +46,7 @@ uint64_t Writer::bytes_pushed() const
 
 string_view Reader::peek() const
 {
-  if ( stream_.data() == nullptr ) {
+  if ( stream_.empty() ) {
     return {};
   }
   return { &stream_.front(), 1 };
@@ -64,12 +64,11 @@ bool Reader::has_error() const
 
 void Reader::pop( uint64_t len )
 {
-  if ( !( bytes_buffered() < len ) ) {
-    stream_.erase( stream_.begin(), stream_.begin() + static_cast<int64_t>( len ) );
-    bytes_poped_ += len;
-  } else {
-    bytes_poped_ += bytes_buffered();
-    stream_.erase( stream_.begin(), stream_.begin() + static_cast<int64_t>( bytes_buffered() ) );
+  uint64_t count = min( bytes_buffered(), len );
+  bytes_poped_ += count;
+  while ( count > 0 ) {
+    stream_.pop();
+    count--;
   }
 }
 

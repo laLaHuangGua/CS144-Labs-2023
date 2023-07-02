@@ -14,7 +14,7 @@ class ByteStream
 protected:
   uint64_t capacity_;
   // Please add any additional state to the ByteStream here, and not to the Writer and Reader interfaces.
-  std::vector<char> stream_ {};
+  std::queue<char> stream_ {};
   bool is_closed_ = false;
   bool has_error_ = false;
   uint64_t bytes_poped_ = 0;
