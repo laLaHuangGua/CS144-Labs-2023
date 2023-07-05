@@ -2,10 +2,23 @@
 
 #include "byte_stream.hh"
 
+#include <map>
 #include <string>
 
 class Reassembler
 {
+private:
+  struct Info
+  {
+    size_t size_;
+    bool is_last_substring_;
+    std::string substring_;
+  };
+
+  std::map<uint64_t, Info> substrings_ {};
+  uint64_t next_seq_num_ = 0;
+  uint64_t bytes_pending_ = 0;
+
 public:
   /*
    * Insert a new substring to be reassembled into a ByteStream.
@@ -31,4 +44,8 @@ public:
 
   // How many bytes are stored in the Reassembler itself?
   uint64_t bytes_pending() const;
+
+private:
+  uint64_t min_space( const Writer& writer, const size_t size ) const;
+  void scan_storage( Writer& output );
 };
