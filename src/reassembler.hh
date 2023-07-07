@@ -2,22 +2,36 @@
 
 #include "byte_stream.hh"
 
-#include <map>
+#include <climits>
+#include <set>
 #include <string>
+#include <unordered_map>
+
+struct Index
+{
+  uint64_t first_index_;
+  uint64_t end_index_;
+
+  bool operator<( const Index& other ) const { return first_index_ < other.first_index_; }
+};
+
+inline bool operator<( const uint64_t& first_index, const Index& other )
+{
+  return first_index < other.first_index_;
+}
+inline bool operator<( const Index& other, const uint64_t& first_index )
+{
+  return other.first_index_ < first_index;
+}
 
 class Reassembler
 {
 private:
-  struct Info
-  {
-    size_t size_;
-    bool is_last_substring_;
-    std::string substring_;
-  };
-
-  std::map<uint64_t, Info> substrings_ {};
+  std::unordered_map<uint64_t, std::string> substrings_ {};
+  std::set<Index, std::less<>> occupied_range_ {};
   uint64_t next_seq_num_ = 0;
   uint64_t bytes_pending_ = 0;
+  uint64_t last_substring_end_index_ = UINT64_MAX;
 
 public:
   /*
@@ -46,6 +60,8 @@ public:
   uint64_t bytes_pending() const;
 
 private:
-  uint64_t min_space( const Writer& writer, const size_t size ) const;
-  void scan_storage( Writer& output );
+  uint64_t space( const Writer& writer ) const;
+  bool check_range( std::string& data, uint64_t& first_index );
+  void scan_storage( Writer& writer );
+  void check_last_byte_is_pushed( Writer& writer ) const;
 };
