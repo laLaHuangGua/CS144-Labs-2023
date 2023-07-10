@@ -54,18 +54,18 @@ uint64_t Reassembler::space( const Writer& writer ) const
 
 bool Reassembler::check_range( std::string& data, uint64_t& first_index, Writer& writer )
 {
+  if ( occupied_range_.empty() ) {
+    return true;
+  }
   auto end_index = data.size() + first_index;
 
   // Case 1: lower_bound - 1
   auto it = occupied_range_.lower_bound( first_index );
-  if ( it == occupied_range_.end() ) {
-    return true;
-  }
   if ( it != occupied_range_.begin() ) {
     it--;
     if ( it->end_index_ > first_index ) {
       if ( it->end_index_ < end_index ) {
-        data = data.substr( it->end_index_ );
+        data = data.substr( it->end_index_ - first_index, data.size() );
         first_index = it->end_index_;
         it = occupied_range_.lower_bound( first_index );
       } else {
@@ -99,7 +99,7 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index, Writer&
       }
     } else {
       end_index = it->first_index_;
-      data = data.substr( first_index, end_index );
+      data = data.substr( 0, end_index - first_index );
       break;
     }
   }
@@ -108,10 +108,18 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index, Writer&
 
 void Reassembler::scan_storage( Writer& writer )
 {
-  while ( erase_substring_by( next_seq_num_, writer, true ) ) {
-    ;
-  }
   erase_old_substring();
+  if ( !occupied_range_.empty() ) {
+    for ( auto it = occupied_range_.begin(); next_seq_num_ >= it->first_index_ && it != occupied_range_.end(); ) {
+      const auto substring_it = substrings_.find( it->first_index_ );
+      writer.push( substring_it->second.substr( next_seq_num_ - it->first_index_ ) );
+      bytes_pending_ -= ( it->end_index_ - it->first_index_ );
+      next_seq_num_ = it->end_index_;
+      it = occupied_range_.erase( it );
+      substrings_.erase( substring_it );
+    }
+  }
+
   check_last_byte_is_pushed( writer );
 }
 
@@ -134,10 +142,10 @@ bool Reassembler::erase_substring_by( const uint64_t first_index, Writer& writer
   occupied_range_.erase( occupied_range_.find( it->first ) );
   if ( flag ) {
     writer.push( std::move( it->second ) );
+    next_seq_num_ += size;
   }
   substrings_.erase( it );
   bytes_pending_ -= size;
-  next_seq_num_ += size;
   return true;
 }
 
