@@ -61,7 +61,9 @@ public:
 
 private:
   uint64_t space( const Writer& writer ) const;
-  bool check_range( std::string& data, uint64_t& first_index );
+  bool check_range( std::string& data, uint64_t& first_index, Writer& writer );
   void scan_storage( Writer& writer );
   void check_last_byte_is_pushed( Writer& writer ) const;
+  bool erase_substring_by( uint64_t first_index, Writer& writer, bool flag );
+  void erase_old_substring();
 };
