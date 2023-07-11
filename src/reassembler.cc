@@ -21,6 +21,9 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
     if ( data.size() > space( output ) ) {
       return;
     }
+    if ( data.size() == space( output ) ) {
+      data = data.substr( 0, data.size() - 1 );
+    }
     // 3. update bytes_pending and occupied_range
     bytes_pending_ += data.size();
     occupied_range_.emplace( first_index, first_index + data.size() );
