@@ -1,5 +1,7 @@
 #pragma once
 
+#include <climits>
+#include <cmath>
 #include <cstdint>
 
 /*
