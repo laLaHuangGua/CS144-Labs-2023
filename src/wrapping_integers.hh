@@ -1,9 +1,9 @@
 #pragma once
 
-#include <climits>
-#include <cmath>
+#include <algorithm>
 #include <cstdint>
 
+#define DIST( val, checkpoint ) max( val, checkpoint ) - min( val, checkpoint )
 /*
  * The Wrap32 type represents a 32-bit unsigned integer that:
  *    - starts at an arbitrary "zero point" (initial value), and
