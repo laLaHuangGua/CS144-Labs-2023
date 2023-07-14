@@ -10,7 +10,6 @@ private:
   std::optional<Wrap32> zero_point_ {};
   std::optional<Wrap32> FIN_seqno {};
   Wrap32 ackno_ { 0 };
-  uint64_t pre_bytes_pushed_ { 0 };
 
 public:
   /*

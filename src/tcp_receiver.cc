@@ -10,9 +10,9 @@ void TCPReceiver::receive( TCPSenderMessage message, Reassembler& reassembler, W
     reassembler.insert( 0, message.payload, message.FIN, inbound_stream );
   } else if ( zero_point_.has_value() ) {
     const uint64_t first_index = message.seqno.unwrap( zero_point_.value(), inbound_stream.bytes_pushed() ) - 1;
-    pre_bytes_pushed_ = inbound_stream.bytes_pushed();
+    const uint64_t pre_bytes_pushed = inbound_stream.bytes_pushed();
     reassembler.insert( first_index, message.payload, message.FIN, inbound_stream );
-    ackno_ = ackno_ + ( inbound_stream.bytes_pushed() - pre_bytes_pushed_ );
+    ackno_ = ackno_ + ( inbound_stream.bytes_pushed() - pre_bytes_pushed );
   }
   if ( message.FIN && zero_point_.has_value() ) {
     FIN_seqno = message.seqno + ( message.sequence_length() - 1 );
