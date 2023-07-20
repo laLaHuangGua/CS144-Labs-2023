@@ -4,6 +4,9 @@ using namespace std;
 
 void TCPReceiver::receive( TCPSenderMessage message, Reassembler& reassembler, Writer& inbound_stream )
 {
+  if ( zero_point_.has_value() && message.seqno == zero_point_ ) {
+    return;
+  }
   if ( message.SYN ) {
     zero_point_ = message.seqno;
     ackno_ = zero_point_.value() + message.sequence_length();
