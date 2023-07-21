@@ -12,9 +12,11 @@ class TCPSender
   bool window_is_nonzero_ = true;
   bool retransmit_flag_ = false;
   bool pre_segment_has_FIN_ = false;
+  bool can_use_magic_ = false;
+  bool available_to_send_FIN_ = false;
   uint16_t remaining_window_size_ = 1;
   uint64_t absolute_seqno_ = 0; // as checkpoint
-  std::optional<uint64_t> pre_unwarped_ackno_ {};
+  uint64_t pre_unwarped_ackno_ = 0;
 
   bool no_out_of_win_segment_ = true;
   size_t next_segment_ = 0;

@@ -36,7 +36,11 @@ optional<TCPSenderMessage> TCPSender::maybe_send()
 
 void TCPSender::push( Reader& outbound_stream )
 {
-  uint64_t window_size = window_is_nonzero_ ? remaining_window_size_ : 1;
+  uint64_t window_size = remaining_window_size_;
+  if ( remaining_window_size_ == 0 && can_use_magic_ ) {
+    can_use_magic_ = false;
+    window_size = 1;
+  }
   while ( window_size > 0 ) {
     TCPSenderMessage msg {};
     // With SYN
@@ -65,6 +69,10 @@ void TCPSender::push( Reader& outbound_stream )
     if ( msg.sequence_length() == 0 ) {
       break;
     }
+    if ( msg.FIN && !available_to_send_FIN_ ) {
+      pre_segment_has_FIN_ = false;
+      break;
+    }
     // set seqno
     msg.seqno = Wrap32::wrap( absolute_seqno_, isn_ );
     absolute_seqno_ += msg.sequence_length();
@@ -83,11 +91,24 @@ TCPSenderMessage TCPSender::send_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
+  uint64_t current_unwraped_ackno = 0;
+  if ( msg.ackno.has_value() ) {
+    current_unwraped_ackno = msg.ackno.value().unwrap( isn_, absolute_seqno_ );
+  }
+  if ( current_unwraped_ackno > absolute_seqno_ ) {
+    return;
+  }
+  available_to_send_FIN_ = msg.window_size + current_unwraped_ackno > absolute_seqno_;
+  if ( msg.window_size == 0 ) {
+    available_to_send_FIN_ = msg.window_size + current_unwraped_ackno >= absolute_seqno_;
+  }
   remaining_window_size_ = msg.window_size;
   window_is_nonzero_ = static_cast<bool>( msg.window_size );
-  const uint64_t current_unwraped_ackno = msg.ackno.value_or( Wrap32( 0 ) ).unwrap( isn_, absolute_seqno_ );
+  if ( !window_is_nonzero_ ) {
+    can_use_magic_ = true;
+  }
 
-  if ( !pre_unwarped_ackno_.has_value() || pre_unwarped_ackno_ < current_unwraped_ackno ) {
+  if ( pre_unwarped_ackno_ < current_unwraped_ackno ) {
     timer_->set_RTO_by_factor( 1 );
     if ( !no_outstanding_segment() ) {
       timer_->restart();
