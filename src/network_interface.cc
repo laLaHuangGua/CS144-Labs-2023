@@ -93,7 +93,7 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
 optional<EthernetFrame> NetworkInterface::maybe_send()
 {
   if ( !frames_.empty() ) {
-    const EthernetFrame frame = frames_.front();
+    EthernetFrame frame = std::move( frames_.front() );
     frames_.pop();
     return frame;
   }
