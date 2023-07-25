@@ -1,6 +1,7 @@
 #pragma once
 
 #include "address.hh"
+#include "arp_message.hh"
 #include "ethernet_frame.hh"
 #include "ipv4_datagram.hh"
 
@@ -10,6 +11,7 @@
 #include <queue>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 // A "network interface" that connects IP (the internet layer, or network layer)
 // with Ethernet (the network access layer, or link layer).
@@ -34,12 +36,41 @@
 // and learns or replies as necessary.
 class NetworkInterface
 {
+public:
+  static constexpr size_t MAX_LIFE_TIME = 30000;
+  static constexpr size_t ARP_MESSAGE_TIMEOUT = 5000;
+
 private:
   // Ethernet (known as hardware, network-access, or link-layer) address of the interface
   EthernetAddress ethernet_address_;
 
   // IP (known as Internet-layer or network-layer) address of the interface
   Address ip_address_;
+
+  // For EthernetFrame to be sent
+  std::queue<EthernetFrame> frames_ {};
+
+  // For arp translation table
+  struct EthernetAddressWithTimer
+  {
+    EthernetAddress ethernet_address_;
+    size_t age_;
+
+    EthernetAddressWithTimer( EthernetAddress ethernet_address, size_t age )
+      : ethernet_address_( ethernet_address ), age_( age )
+    {}
+  };
+  std::unordered_map<uint32_t, EthernetAddressWithTimer> arp_cache_ {};
+
+  // For cached datagrams
+  struct DatagramWithTimer
+  {
+    InternetDatagram dgram_;
+    size_t time_;
+
+    DatagramWithTimer( InternetDatagram dgram, size_t time ) : dgram_( std::move( dgram ) ), time_( time ) {}
+  };
+  std::unordered_map<uint32_t, DatagramWithTimer> dgrams_ {};
 
 public:
   // Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer)
@@ -64,4 +95,10 @@ public:
 
   // Called periodically when time elapses
   void tick( size_t ms_since_last_tick );
+
+private:
+  ARPMessage make_arp( const uint16_t opcode,
+                       const EthernetAddress target_ethernet_address,
+                       const uint32_t target_ip_address_numeric ) const;
+  EthernetFrame make_frame( const EthernetAddress& dst, const uint16_t type, std::vector<Buffer> payload ) const;
 };

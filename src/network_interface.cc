@@ -22,24 +22,105 @@ NetworkInterface::NetworkInterface( const EthernetAddress& ethernet_address, con
 // Address::ipv4_numeric() method.
 void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Address& next_hop )
 {
-  (void)dgram;
-  (void)next_hop;
+  if ( const auto it = arp_cache_.find( next_hop.ipv4_numeric() ); it != arp_cache_.end() ) {
+    frames_.emplace( make_frame( it->second.ethernet_address_, EthernetHeader::TYPE_IPv4, serialize( dgram ) ) );
+  } else {
+    if ( const auto it_dgram = dgrams_.find( next_hop.ipv4_numeric() ); it_dgram != dgrams_.end() ) {
+      return;
+    }
+    frames_.emplace(
+      make_frame( ETHERNET_BROADCAST,
+                  EthernetHeader::TYPE_ARP,
+                  serialize( make_arp( ARPMessage::OPCODE_REQUEST, {}, next_hop.ipv4_numeric() ) ) ) );
+    dgrams_.emplace( next_hop.ipv4_numeric(), DatagramWithTimer { dgram, 0 } );
+  }
 }
 
 // frame: the incoming Ethernet frame
 optional<InternetDatagram> NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
-  (void)frame;
+  if ( frame.header.type == EthernetHeader::TYPE_IPv4 and frame.header.dst == ethernet_address_ ) {
+    InternetDatagram dgram;
+    if ( parse( dgram, frame.payload ) ) {
+      return dgram;
+    }
+    return {};
+  }
+  if ( frame.header.type == EthernetHeader::TYPE_ARP ) {
+    ARPMessage arp;
+    if ( parse( arp, frame.payload ) ) {
+      arp_cache_.emplace( arp.sender_ip_address, EthernetAddressWithTimer { arp.sender_ethernet_address, 0 } );
+      // Send cached dgram
+      if ( const auto it = dgrams_.find( arp.sender_ip_address ); it != dgrams_.end() ) {
+        frames_.emplace(
+          make_frame( arp.sender_ethernet_address, EthernetHeader::TYPE_IPv4, serialize( it->second.dgram_ ) ) );
+        dgrams_.erase( it );
+      }
+      // Generate arp reply
+      if ( arp.target_ip_address == ip_address_.ipv4_numeric() and arp.opcode == ARPMessage::OPCODE_REQUEST ) {
+        frames_.emplace( make_frame(
+          arp.sender_ethernet_address,
+          EthernetHeader::TYPE_ARP,
+          serialize( make_arp( ARPMessage::OPCODE_REPLY, arp.sender_ethernet_address, arp.sender_ip_address ) ) ) );
+      }
+    }
+  }
   return {};
 }
 
 // ms_since_last_tick: the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
-  (void)ms_since_last_tick;
+  for ( auto it = arp_cache_.begin(); it != arp_cache_.end(); ) {
+    it->second.age_ += ms_since_last_tick;
+    if ( !( it->second.age_ < MAX_LIFE_TIME ) ) {
+      it = arp_cache_.erase( it );
+    } else {
+      ++it;
+    }
+  }
+  for ( auto& dgram : dgrams_ ) {
+    dgram.second.time_ += ms_since_last_tick;
+    if ( !( dgram.second.time_ < ARP_MESSAGE_TIMEOUT ) ) {
+      frames_.emplace( make_frame( ETHERNET_BROADCAST,
+                                   EthernetHeader::TYPE_ARP,
+                                   serialize( make_arp( ARPMessage::OPCODE_REQUEST, {}, dgram.first ) ) ) );
+      dgram.second.time_ -= ARP_MESSAGE_TIMEOUT;
+    }
+  }
 }
 
 optional<EthernetFrame> NetworkInterface::maybe_send()
 {
+  if ( !frames_.empty() ) {
+    const EthernetFrame frame = frames_.front();
+    frames_.pop();
+    return frame;
+  }
   return {};
+}
+
+ARPMessage NetworkInterface::make_arp( const uint16_t opcode,
+                                       const EthernetAddress target_ethernet_address,
+                                       const uint32_t target_ip_address_numeric ) const
+{
+  ARPMessage arp;
+  arp.opcode = opcode;
+  arp.sender_ethernet_address = ethernet_address_;
+  arp.sender_ip_address = ip_address_.ipv4_numeric();
+  arp.target_ethernet_address = target_ethernet_address;
+  arp.target_ip_address = target_ip_address_numeric;
+  return arp;
+}
+
+EthernetFrame NetworkInterface::make_frame( const EthernetAddress& dst,
+                                            const uint16_t type,
+                                            vector<Buffer> payload ) const
+{
+  EthernetFrame frame;
+  frame.header.src = ethernet_address_;
+  frame.header.dst = dst;
+  frame.header.type = type;
+  frame.payload = std::move( payload );
+  return frame;
 }
