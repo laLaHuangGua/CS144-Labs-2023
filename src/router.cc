@@ -20,10 +20,31 @@ void Router::add_route( const uint32_t route_prefix,
        << static_cast<int>( prefix_length ) << " => " << ( next_hop.has_value() ? next_hop->ip() : "(direct)" )
        << " on interface " << interface_num << "\n";
 
-  (void)route_prefix;
-  (void)prefix_length;
-  (void)next_hop;
-  (void)interface_num;
+  routes_.emplace_back( route_prefix, prefix_length, next_hop, interface_num );
 }
 
-void Router::route() {}
+void Router::route()
+{
+  for ( auto& inf : interfaces_ ) {
+    auto optional_dgram = inf.maybe_receive();
+    while ( optional_dgram.has_value() ) {
+      InternetDatagram dgram = std::move( optional_dgram.value() );
+      size_t best = SIZE_MAX;
+      for ( size_t i = 0; i < routes_.size(); ++i ) {
+        if ( routes_[i].match( dgram.header.dst ) and ( best == SIZE_MAX or routes_[best] < routes_[i] ) ) {
+          best = i;
+        }
+      }
+      if ( best != SIZE_MAX and dgram.header.ttl > 1 ) {
+        dgram.header.ttl--;
+        dgram.header.compute_checksum();
+        Address next_hop = Address::from_ipv4_numeric( dgram.header.dst );
+        if ( routes_[best].next_hop_.has_value() ) {
+          next_hop = routes_[best].next_hop_.value();
+        }
+        interface( routes_[best].interface_num_ ).send_datagram( dgram, next_hop );
+      }
+      optional_dgram = inf.maybe_receive();
+    }
+  }
+}
