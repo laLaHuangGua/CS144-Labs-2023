@@ -36,7 +36,7 @@ bool Writer::is_closed() const
 
 uint64_t Writer::available_capacity() const
 {
-  return static_cast<uint64_t>( capacity_ - stream_.size() );
+  return capacity_ - stream_.size();
 }
 
 uint64_t Writer::bytes_pushed() const
@@ -74,7 +74,7 @@ void Reader::pop( uint64_t len )
 
 uint64_t Reader::bytes_buffered() const
 {
-  return static_cast<uint64_t>( stream_.size() );
+  return stream_.size();
 }
 
 uint64_t Reader::bytes_popped() const
