@@ -11,9 +11,7 @@ void get_URL( const string& host, const string& path )
 {
   TCPSocket socket {};
   socket.connect( { host, "http" } );
-  socket.write( "GET " + path + " HTTP/1.1\r\n" );
-  socket.write( "Host: " + host + "\r\n" );
-  socket.write( "Connection: close\r\n\r\n" );
+  socket.write( "GET " + path + " HTTP/1.1\r\n" + "Host: " + host + "\r\nConnection: close\r\n\r\n" );
   while ( !socket.eof() ) {
     string buffer {};
     socket.read( buffer );
