@@ -51,7 +51,6 @@ private:
   bool fit_space( std::string& data, const Writer& output );
 
   MapIt_t erase_substring_by( MapIt_t it );
-  void erase_useless_substring();
 
   void scan_storage( Writer& writer );
   void check_last_byte_is_pushed( Writer& writer ) const;

@@ -120,11 +120,12 @@ std::pair<bool, MapIt_t> Reassembler::fit_string( std::string& data, uint64_t& f
 
 void Reassembler::scan_storage( Writer& writer )
 {
-  erase_useless_substring();
-  for ( auto it = occupied_range_.begin(); it != occupied_range_.end() && next_seq_num_ >= it->first; ) {
-    const auto substring_it = substrings_.find( it->first );
-    writer.push( substring_it->second.substr( next_seq_num_ - it->first ) );
-    next_seq_num_ = it->second;
+  for ( auto it = occupied_range_.begin(); it != occupied_range_.end() && it->first <= next_seq_num_; ) {
+    if ( it->second > next_seq_num_ ) {
+      const auto substring_it = substrings_.find( it->first );
+      writer.push( substring_it->second.substr( next_seq_num_ - it->first ) );
+      next_seq_num_ = it->second;
+    }
     it = erase_substring_by( it );
   }
 }
@@ -141,11 +142,4 @@ MapIt_t Reassembler::erase_substring_by( MapIt_t it )
   bytes_pending_ -= it->second - it->first;
   substrings_.erase( it->first );
   return occupied_range_.erase( it );
-}
-
-void Reassembler::erase_useless_substring()
-{
-  for ( auto it = occupied_range_.begin(); it != occupied_range_.end() && it->second <= next_seq_num_; ) {
-    it = erase_substring_by( it );
-  }
 }
