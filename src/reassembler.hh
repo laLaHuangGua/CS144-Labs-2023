@@ -7,8 +7,7 @@
 #include <string>
 #include <unordered_map>
 
-using unordered_map_it = std::unordered_map<uint64_t, std::string>::iterator;
-using map_it = std::map<uint64_t, uint64_t>::iterator;
+using MapIt_t = std::map<uint64_t, uint64_t>::iterator;
 
 class Reassembler
 {
@@ -47,9 +46,13 @@ public:
 
 private:
   uint64_t space( const Writer& writer ) const;
-  bool check_range( std::string& data, uint64_t& first_index );
+
+  std::pair<bool, MapIt_t> fit_string( std::string& data, uint64_t& first_index );
+  bool fit_space( std::string& data, const Writer& output );
+
+  MapIt_t erase_substring_by( MapIt_t it );
+  void erase_useless_substring();
+
   void scan_storage( Writer& writer );
   void check_last_byte_is_pushed( Writer& writer ) const;
-  map_it erase_substring_by( map_it it );
-  void erase_old_substring();
 };

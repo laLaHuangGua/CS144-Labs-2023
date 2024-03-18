@@ -11,23 +11,16 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   if ( is_last_substring ) {
     last_substring_end_index_ = end_index;
   }
-
   if ( first_index > next_seq_num_ ) {
-    // 1. check occupied_range
-    if ( !check_range( data, first_index ) ) {
+    auto [success, hint] = fit_string( data, first_index );
+    if ( !success ) {
       return;
     }
-    // 2. check space
-    if ( data.size() > space( output ) ) {
+    if ( !fit_space( data, output ) ) {
       return;
     }
-    if ( data.size() == space( output ) ) {
-      data.pop_back();
-    }
-    // 3. update bytes_pending and occupied_range
     bytes_pending_ += data.size();
-    occupied_range_.emplace( first_index, first_index + data.size() );
-    // 4. emplace
+    occupied_range_.emplace_hint( hint, first_index, first_index + data.size() );
     substrings_.emplace( first_index, std::move( data ) );
 
   } else {
@@ -44,6 +37,17 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   check_last_byte_is_pushed( output );
 }
 
+bool Reassembler::fit_space( std::string& data, const Writer& output )
+{
+  if ( data.size() > space( output ) ) {
+    return false;
+  }
+  if ( data.size() == space( output ) ) {
+    data.pop_back();
+  }
+  return true;
+}
+
 uint64_t Reassembler::bytes_pending() const
 {
   return bytes_pending_;
@@ -54,10 +58,10 @@ uint64_t Reassembler::space( const Writer& writer ) const
   return writer.available_capacity() - bytes_pending_;
 }
 
-bool Reassembler::check_range( std::string& data, uint64_t& first_index )
+std::pair<bool, MapIt_t> Reassembler::fit_string( std::string& data, uint64_t& first_index )
 {
   if ( occupied_range_.empty() ) {
-    return true;
+    return { true, occupied_range_.end() };
   }
   auto end_index = data.size() + first_index;
 
@@ -69,7 +73,7 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index )
     if ( it->second > first_index ) {
       if ( it->second >= end_index ) {
         // this string is already contained by the string iterator points to
-        return false;
+        return { false, {} };
       }
       // cut off the overlapping part
       data = data.substr( it->second - first_index, data.size() );
@@ -81,7 +85,7 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index )
   }
   // the new string is the last string in reassembler storage ( no overlapping )
   if ( it == occupied_range_.end() ) {
-    return true;
+    return { true, occupied_range_.end() };
   }
 
   // Case 2: lower_bound ( equal )
@@ -89,12 +93,12 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index )
     end_index = data.size() + first_index;
     if ( it->second >= end_index ) {
       // this string is already contained by the string iterator points to
-      return false;
+      return { false, {} };
     }
     // erase the string iterator points to and get next string
     it = erase_substring_by( it );
     if ( it == occupied_range_.end() ) {
-      return true;
+      return { true, occupied_range_.end() };
     }
   }
 
@@ -104,28 +108,25 @@ bool Reassembler::check_range( std::string& data, uint64_t& first_index )
     if ( it->second >= end_index ) {
       end_index = it->first;
       data = data.substr( 0, end_index - first_index );
-      return true;
+      break;
     }
     it = erase_substring_by( it );
     if ( it == occupied_range_.end() ) {
-      return true;
+      return { true, occupied_range_.end() };
     }
   }
-  return true;
+  return { true, it };
 }
 
 void Reassembler::scan_storage( Writer& writer )
 {
-  erase_old_substring();
-  if ( !occupied_range_.empty() ) {
-    for ( auto it = occupied_range_.begin(); next_seq_num_ >= it->first && it != occupied_range_.end(); ) {
-      const auto substring_it = substrings_.find( it->first );
-      writer.push( substring_it->second.substr( next_seq_num_ - it->first ) );
-      next_seq_num_ = it->second;
-      it = erase_substring_by( it );
-    }
+  erase_useless_substring();
+  for ( auto it = occupied_range_.begin(); it != occupied_range_.end() && next_seq_num_ >= it->first; ) {
+    const auto substring_it = substrings_.find( it->first );
+    writer.push( substring_it->second.substr( next_seq_num_ - it->first ) );
+    next_seq_num_ = it->second;
+    it = erase_substring_by( it );
   }
-  check_last_byte_is_pushed( writer );
 }
 
 void Reassembler::check_last_byte_is_pushed( Writer& writer ) const
@@ -135,18 +136,16 @@ void Reassembler::check_last_byte_is_pushed( Writer& writer ) const
   }
 }
 
-map_it Reassembler::erase_substring_by( map_it it )
+MapIt_t Reassembler::erase_substring_by( MapIt_t it )
 {
   bytes_pending_ -= it->second - it->first;
   substrings_.erase( it->first );
   return occupied_range_.erase( it );
 }
 
-void Reassembler::erase_old_substring()
+void Reassembler::erase_useless_substring()
 {
-  if ( !occupied_range_.empty() ) {
-    for ( auto it = occupied_range_.begin(); it->second <= next_seq_num_ && it != occupied_range_.end(); ) {
-      it = erase_substring_by( it );
-    }
+  for ( auto it = occupied_range_.begin(); it != occupied_range_.end() && it->second <= next_seq_num_; ) {
+    it = erase_substring_by( it );
   }
 }
