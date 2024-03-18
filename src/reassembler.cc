@@ -129,7 +129,7 @@ void Reassembler::check_last_byte_is_pushed( Writer& writer ) const
   }
 }
 
-void Reassembler::erase_substring_by( const uint64_t first_index )
+void Reassembler::erase_substring_by( uint64_t first_index )
 {
   const auto it = substrings_.find( first_index );
   if ( it == substrings_.end() ) {
@@ -140,7 +140,7 @@ void Reassembler::erase_substring_by( const uint64_t first_index )
   substrings_.erase( it );
 }
 
-map_it Reassembler::erase_substring_by( const map_it it )
+map_it Reassembler::erase_substring_by( map_it it )
 {
   bytes_pending_ -= it->second - it->first;
   substrings_.erase( it->first );

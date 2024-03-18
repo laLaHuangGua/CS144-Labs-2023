@@ -51,6 +51,6 @@ private:
   void scan_storage( Writer& writer );
   void check_last_byte_is_pushed( Writer& writer ) const;
   void erase_substring_by( uint64_t first_index );
-  map_it erase_substring_by( const map_it it );
+  map_it erase_substring_by( map_it it );
   void erase_old_substring();
 };
