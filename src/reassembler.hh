@@ -52,7 +52,6 @@ private:
   MapIt_t erase_substring_by( MapIt_t it );
 
   void scan_storage( Writer& writer );
-  void check_last_byte_is_pushed( Writer& writer ) const;
 
   static uint64_t end_index_of( MapIt_t it );
 };

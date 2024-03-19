@@ -31,7 +31,9 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
 
     scan_storage( output );
   }
-  check_last_byte_is_pushed( output );
+  if ( output.bytes_pushed() == last_substring_end_index_ ) {
+    output.close();
+  }
 }
 
 bool Reassembler::fit_space( std::string& data, const Writer& output )
@@ -129,13 +131,6 @@ void Reassembler::scan_storage( Writer& writer )
       next_seq_num_ = end_index_of( it );
     }
     it = erase_substring_by( it );
-  }
-}
-
-void Reassembler::check_last_byte_is_pushed( Writer& writer ) const
-{
-  if ( writer.bytes_pushed() == last_substring_end_index_ ) {
-    writer.close();
   }
 }
 
