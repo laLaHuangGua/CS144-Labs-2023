@@ -23,10 +23,10 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
     substrings_.emplace_hint( hint, first_index, std::move( data ) );
 
   } else {
-    const auto max_space = static_cast<int64_t>( min( space( output ), end_index - next_seq_num_ ) );
-    const auto start = static_cast<int64_t>( next_seq_num_ - first_index );
+    const auto max_space = min( space( output ), end_index - next_seq_num_ );
 
-    output.push( { data.begin() + start, data.begin() + start + max_space } );
+    data.erase( 0, next_seq_num_ - first_index ).erase( max_space );
+    output.push( std::move( data ) );
     next_seq_num_ += max_space;
 
     scan_storage( output );
@@ -76,7 +76,7 @@ std::pair<bool, MapIt_t> Reassembler::fit_string( std::string& data, uint64_t& f
         return { false, {} };
       }
       // cut off the overlapping part
-      data = data.substr( end_index_it - first_index, data.size() );
+      data.erase( 0, end_index_it - first_index );
       first_index = end_index_it;
     }
     // whether the first_index is updated or not,
@@ -107,7 +107,7 @@ std::pair<bool, MapIt_t> Reassembler::fit_string( std::string& data, uint64_t& f
   while ( it->first < end_index ) {
     if ( end_index_of( it ) >= end_index ) {
       end_index = it->first;
-      data = data.substr( 0, end_index - first_index );
+      data.erase( end_index - first_index );
       break;
     }
     it = erase_substring_by( it );
@@ -126,11 +126,16 @@ uint64_t Reassembler::end_index_of( MapIt_t it )
 void Reassembler::scan_storage( Writer& writer )
 {
   for ( auto it = substrings_.begin(); it != substrings_.end() && it->first <= next_seq_num_; ) {
-    if ( end_index_of( it ) > next_seq_num_ ) {
-      writer.push( it->second.substr( next_seq_num_ - it->first ) );
-      next_seq_num_ = end_index_of( it );
+    auto end_index = end_index_of( it );
+    if ( end_index > next_seq_num_ ) {
+      writer.push( std::move( it->second.erase( 0, next_seq_num_ - it->first ) ) );
+      next_seq_num_ = end_index;
+      // do not use erase_substring_by(), it->second is moved and thus its size is changed
+      bytes_pending_ -= end_index - it->first;
+      it = substrings_.erase( it );
+    } else {
+      it = erase_substring_by( it );
     }
-    it = erase_substring_by( it );
   }
 }
 
