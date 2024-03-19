@@ -7,13 +7,12 @@
 #include <string>
 #include <unordered_map>
 
-using MapIt_t = std::map<uint64_t, uint64_t>::iterator;
+using MapIt_t = std::map<uint64_t, std::string>::iterator;
 
 class Reassembler
 {
 private:
-  std::unordered_map<uint64_t, std::string> substrings_ {};
-  std::map<uint64_t, uint64_t> occupied_range_ {};
+  std::map<uint64_t, std::string> substrings_ {};
   uint64_t next_seq_num_ = 0;
   uint64_t bytes_pending_ = 0;
   uint64_t last_substring_end_index_ = UINT64_MAX;
@@ -54,4 +53,6 @@ private:
 
   void scan_storage( Writer& writer );
   void check_last_byte_is_pushed( Writer& writer ) const;
+
+  static uint64_t end_index_of( MapIt_t it );
 };
