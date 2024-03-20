@@ -119,7 +119,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   }
 }
 
-void TCPSender::check_outstanding_segments( const uint64_t current_unwraped_ackno )
+void TCPSender::check_outstanding_segments( uint64_t current_unwraped_ackno )
 {
   while ( !no_outstanding_segment() ) {
     const auto it = segments_.begin();
@@ -165,7 +165,7 @@ bool TCPSender::no_cached_segment() const
 }
 
 // Timer implementation
-TCPSender::Timer::Timer( const uint64_t initial_RTO_ms )
+TCPSender::Timer::Timer( uint64_t initial_RTO_ms )
   : initial_RTO_ms_( initial_RTO_ms ), current_RTO_ms_( initial_RTO_ms )
 {}
 
@@ -174,7 +174,7 @@ void TCPSender::Timer::run()
   is_running_ = true;
 }
 
-void TCPSender::Timer::elapse( const uint64_t time_passed )
+void TCPSender::Timer::elapse( uint64_t time_passed )
 {
   if ( is_running() ) {
     cumulative_time_elapsed_ += time_passed;
@@ -184,7 +184,7 @@ void TCPSender::Timer::elapse( const uint64_t time_passed )
   }
 }
 
-void TCPSender::Timer::set_RTO_by_factor( const uint8_t factor )
+void TCPSender::Timer::set_RTO_by_factor( uint8_t factor )
 {
   if ( factor == 1 ) {
     current_RTO_ms_ = initial_RTO_ms_;

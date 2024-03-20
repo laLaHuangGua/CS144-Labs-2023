@@ -33,11 +33,11 @@ class TCPSender
     uint64_t cumulative_time_elapsed_ = 0;
     uint64_t current_RTO_ms_;
 
-    explicit Timer( const uint64_t initial_RTO_ms );
+    explicit Timer( uint64_t initial_RTO_ms );
 
     void run();
-    void elapse( const uint64_t time_passed );
-    void set_RTO_by_factor( const uint8_t factor );
+    void elapse( uint64_t time_passed );
+    void set_RTO_by_factor( uint8_t factor );
     void stop();
     void expire();
     void restart();
@@ -80,7 +80,7 @@ public:
   uint64_t consecutive_retransmissions() const; // How many consecutive *re*transmissions have happened?
 
 private:
-  void check_outstanding_segments( const uint64_t current_unwraped_ackno );
+  void check_outstanding_segments( uint64_t current_unwraped_ackno );
   bool no_outstanding_segment() const; // sent but unacked
   bool no_cached_segment() const;      // not yet send but usable
 };
