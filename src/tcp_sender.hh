@@ -5,9 +5,64 @@
 #include "tcp_sender_message.hh"
 #include <memory>
 
+class Timer
+{
+private:
+  bool is_running_ = false;
+  uint64_t initial_RTO_ms_;
+  uint64_t time_elapsed_ = 0;
+  uint64_t current_RTO_ms_;
+
+public:
+  explicit Timer( uint64_t initial_RTO_ms ) : initial_RTO_ms_( initial_RTO_ms ), current_RTO_ms_( initial_RTO_ms )
+  {}
+
+  void run() { is_running_ = true; }
+
+  void elapse( uint64_t time )
+  {
+    if ( is_running() ) {
+      time_elapsed_ += time;
+    }
+    if ( current_RTO_ms_ <= time_elapsed_ ) {
+      expire();
+    }
+  }
+
+  // Multiple current_RTO_ms by a factor greater or equal 0.
+  // If factor == 0, reset RTO to initial_RTO_ms.
+  void set_RTO_by_factor( uint8_t factor )
+  {
+    if ( factor == 0 ) {
+      current_RTO_ms_ = initial_RTO_ms_;
+    } else {
+      current_RTO_ms_ *= factor;
+    }
+  }
+
+  void stop() { is_running_ = false; }
+
+  void expire()
+  {
+    is_running_ = false;
+    time_elapsed_ = 0;
+  }
+
+  void restart()
+  {
+    is_running_ = true;
+    time_elapsed_ = 0;
+  }
+
+  bool expired() const { return !is_running_ && time_elapsed_ == 0; }
+
+  bool is_running() const { return is_running_; }
+};
+
 class TCPSender
 {
   Wrap32 isn_;
+  std::unique_ptr<Timer> timer_;
 
   bool window_is_nonzero_ = true;
   bool retransmit_flag_ = false;
@@ -24,37 +79,6 @@ class TCPSender
 
   uint64_t sequence_numbers_in_flight_ = 0;
   uint64_t consecutive_retransmissions_ = 0;
-
-  class Timer
-  {
-  public:
-    bool is_running_ = false;
-    uint64_t initial_RTO_ms_;
-    uint64_t cumulative_time_elapsed_ = 0;
-    uint64_t current_RTO_ms_;
-
-    explicit Timer( uint64_t initial_RTO_ms );
-
-    void run();
-    void elapse( uint64_t time_passed );
-    void set_RTO_by_factor( uint8_t factor );
-    void stop();
-    void expire();
-    void restart();
-
-    bool has_expired() const;
-    bool is_running() const;
-
-    ~Timer() = default;
-
-    // no copy or move
-    Timer( const Timer& other ) = delete;
-    Timer& operator=( const Timer& other ) = delete;
-    Timer( Timer&& other ) = delete;
-    Timer& operator=( Timer&& other ) = delete;
-  };
-
-  std::unique_ptr<Timer> timer_;
 
 public:
   /* Construct TCP sender with given default Retransmission Timeout and possible ISN */

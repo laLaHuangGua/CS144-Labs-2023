@@ -109,7 +109,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   }
 
   if ( pre_unwarped_ackno_ < current_unwraped_ackno ) {
-    timer_->set_RTO_by_factor( 1 );
+    timer_->set_RTO_by_factor( 0 );
     if ( !no_outstanding_segment() ) {
       timer_->restart();
     }
@@ -139,13 +139,13 @@ void TCPSender::tick( uint64_t ms_since_last_tick )
     timer_->stop();
   }
   timer_->elapse( ms_since_last_tick );
-  if ( timer_->has_expired() ) {
+  if ( timer_->expired() ) {
     retransmit_flag_ = true;
     if ( window_is_nonzero_ ) {
       consecutive_retransmissions_ += 1;
       timer_->set_RTO_by_factor( 2 );
     } else {
-      timer_->set_RTO_by_factor( 1 );
+      timer_->set_RTO_by_factor( 0 );
     }
     timer_->restart();
   }
@@ -162,60 +162,4 @@ bool TCPSender::no_cached_segment() const
     return next_segment_ == segments_.size();
   }
   return segments_.size() - 1 == next_segment_;
-}
-
-// Timer implementation
-TCPSender::Timer::Timer( uint64_t initial_RTO_ms )
-  : initial_RTO_ms_( initial_RTO_ms ), current_RTO_ms_( initial_RTO_ms )
-{}
-
-void TCPSender::Timer::run()
-{
-  is_running_ = true;
-}
-
-void TCPSender::Timer::elapse( uint64_t time_passed )
-{
-  if ( is_running() ) {
-    cumulative_time_elapsed_ += time_passed;
-  }
-  if ( current_RTO_ms_ <= cumulative_time_elapsed_ ) {
-    expire();
-  }
-}
-
-void TCPSender::Timer::set_RTO_by_factor( uint8_t factor )
-{
-  if ( factor == 1 ) {
-    current_RTO_ms_ = initial_RTO_ms_;
-  } else {
-    current_RTO_ms_ *= factor;
-  }
-}
-
-void TCPSender::Timer::stop()
-{
-  is_running_ = false;
-}
-
-void TCPSender::Timer::expire()
-{
-  is_running_ = false;
-  cumulative_time_elapsed_ = 0;
-}
-
-void TCPSender::Timer::restart()
-{
-  is_running_ = true;
-  cumulative_time_elapsed_ = 0;
-}
-
-bool TCPSender::Timer::has_expired() const
-{
-  return !is_running_ && cumulative_time_elapsed_ == 0;
-}
-
-bool TCPSender::Timer::is_running() const
-{
-  return is_running_;
 }
