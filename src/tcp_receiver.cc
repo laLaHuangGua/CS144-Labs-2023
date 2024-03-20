@@ -2,25 +2,36 @@
 
 using namespace std;
 
+/*
+ * The message can have both the FIN bit and the SYN bit set, and possibly carry payload.
+ * Reset the isn_ if receive a new SYN (i.e. a SYN message with new isn_).
+ * Do nothing if receive a old SYN (i.e. a SYN message with current isn_).
+ * It is still possible for a segment to arrive after the receiver receives the FIN segment.
+ *
+ * Hint:
+ *  The bytes_pushed() method of inbound_stream returns the next stream index it expects.
+ *  The bytes_pushed() + 1 represents the next absolute sequence index it expects.
+ */
 void TCPReceiver::receive( TCPSenderMessage message, Reassembler& reassembler, Writer& inbound_stream )
 {
-  if ( zero_point_.has_value() && message.seqno == zero_point_ ) {
+  if ( isn_.has_value() && message.seqno == isn_ ) {
     return;
   }
   if ( message.SYN ) {
-    zero_point_ = message.seqno;
-    ackno_ = zero_point_.value() + message.sequence_length();
+    isn_ = message.seqno;
+    ackno_ = isn_.value() + message.sequence_length();
     reassembler.insert( 0, message.payload, message.FIN, inbound_stream );
-  } else if ( zero_point_.has_value() ) {
-    const uint64_t first_index = message.seqno.unwrap( zero_point_.value(), inbound_stream.bytes_pushed() ) - 1;
-    const uint64_t pre_bytes_pushed = inbound_stream.bytes_pushed();
-    reassembler.insert( first_index, message.payload, message.FIN, inbound_stream );
-    ackno_ = ackno_ + ( inbound_stream.bytes_pushed() - pre_bytes_pushed );
+  } else if ( isn_.has_value() ) {
+    reassembler.insert( message.seqno.unwrap( isn_.value(), inbound_stream.bytes_pushed() ) - 1,
+                        message.payload,
+                        message.FIN,
+                        inbound_stream );
+    ackno_ = Wrap32::wrap( inbound_stream.bytes_pushed() + 1, isn_.value() );
   }
-  if ( message.FIN && zero_point_.has_value() ) {
-    FIN_seqno = message.seqno + ( message.sequence_length() - 1 );
+  if ( message.FIN && isn_.has_value() ) {
+    FIN_seqno_ = message.seqno + ( message.sequence_length() - 1 );
   }
-  if ( FIN_seqno.has_value() && FIN_seqno == ackno_ ) {
+  if ( FIN_seqno_.has_value() && FIN_seqno_ == ackno_ ) {
     ackno_ = ackno_ + 1;
     inbound_stream.close();
   }
@@ -28,8 +39,8 @@ void TCPReceiver::receive( TCPSenderMessage message, Reassembler& reassembler, W
 
 TCPReceiverMessage TCPReceiver::send( const Writer& inbound_stream ) const
 {
-  const uint16_t window_size = min( static_cast<uint64_t>( UINT16_MAX ), inbound_stream.available_capacity() );
-  if ( !zero_point_.has_value() ) {
+  const uint16_t window_size = min( MAX_RWND_SIZE, inbound_stream.available_capacity() );
+  if ( !isn_.has_value() ) {
     return { {}, window_size };
   }
   return { ackno_, window_size };

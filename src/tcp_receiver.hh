@@ -4,11 +4,13 @@
 #include "tcp_receiver_message.hh"
 #include "tcp_sender_message.hh"
 
+#define MAX_RWND_SIZE ( ( 1UL << 16 ) - 1 )
+
 class TCPReceiver
 {
 private:
-  std::optional<Wrap32> zero_point_ {};
-  std::optional<Wrap32> FIN_seqno {};
+  std::optional<Wrap32> isn_ {};
+  std::optional<Wrap32> FIN_seqno_ {};
   Wrap32 ackno_ { 0 };
 
 public:
