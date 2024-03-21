@@ -27,49 +27,47 @@ optional<TCPSenderMessage> TCPSender::maybe_send()
 void TCPSender::push( Reader& outbound_stream )
 {
   uint64_t window_size = remaining_window_size_;
-  if ( remaining_window_size_ == 0 && can_use_magic_ ) {
+  if ( window_size == 0 && can_use_magic_ ) {
     can_use_magic_ = false;
     window_size = 1;
   }
   while ( window_size > 0 ) {
     TCPSenderMessage msg {};
-    // With SYN
+
+    // Deal with SYN
     if ( absolute_seqno_ == 0 ) {
       window_size -= 1;
       msg.SYN = true;
     }
-    // With Payload and pop bytes
-    uint64_t payload_size = min(
-      { static_cast<uint64_t>( TCPConfig::MAX_PAYLOAD_SIZE ), window_size, outbound_stream.bytes_buffered() } );
-    string payload {};
-    while ( payload_size > 0 ) {
-      auto view = outbound_stream.peek();
-      payload += view;
-      outbound_stream.pop( view.size() );
-      payload_size--;
+
+    // Deal with payload
+    uint64_t payload_size = min( { TCPConfig::MAX_PAYLOAD_SIZE, window_size, outbound_stream.bytes_buffered() } );
+    if ( payload_size > 0 ) {
+      string payload {};
+      read( outbound_stream, payload_size, payload );
+      window_size -= payload.size();
+      msg.payload = std::move( payload );
     }
-    window_size -= payload.size();
-    msg.payload = std::move( payload );
-    // With FIN
+
+    // Deal with FIN
     if ( window_size > 0 && outbound_stream.is_finished() && !pre_segment_has_FIN_ ) {
       msg.FIN = true;
       pre_segment_has_FIN_ = true;
       window_size--;
     }
     if ( msg.sequence_length() == 0 ) {
-      break;
+      return;
     }
     if ( msg.FIN && !available_to_send_FIN_ ) {
       pre_segment_has_FIN_ = false;
-      break;
+      return;
     }
-    // set seqno
+
     msg.seqno = Wrap32::wrap( absolute_seqno_, isn_ );
     absolute_seqno_ += msg.sequence_length();
-    // cashed segment
     sequence_numbers_in_flight_ += msg.sequence_length();
     segments_.push_back( std::move( msg ) );
-    // set window
+
     remaining_window_size_ = window_size;
   }
 }
@@ -92,15 +90,16 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   if ( current_unwraped_ackno > absolute_seqno_ ) {
     return;
   }
+
+  // Don't add FIN if this would make the segment exceed the receiver's window
   available_to_send_FIN_ = msg.window_size + current_unwraped_ackno > absolute_seqno_;
   if ( msg.window_size == 0 ) {
-    available_to_send_FIN_ = msg.window_size + current_unwraped_ackno >= absolute_seqno_;
-  }
-  remaining_window_size_ = msg.window_size;
-  window_is_zero_ = msg.window_size == 0;
-  if ( window_is_zero_ ) {
+    available_to_send_FIN_ = current_unwraped_ackno >= absolute_seqno_;
     can_use_magic_ = true;
   }
+
+  remaining_window_size_ = msg.window_size;
+  window_is_zero_ = msg.window_size == 0;
 
   if ( pre_unwarped_ackno_ < current_unwraped_ackno ) {
     receive_new_ack( current_unwraped_ackno );
@@ -137,6 +136,7 @@ void TCPSender::tick( uint64_t ms_since_last_tick )
 {
   if ( !has_outstanding_segment() && !has_cached_segment() ) {
     timer_->stop();
+    return;
   }
   timer_->elapse( ms_since_last_tick );
   if ( timer_->expired() ) {
