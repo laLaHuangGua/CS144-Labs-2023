@@ -64,13 +64,18 @@ class TCPSender
   Wrap32 isn_;
   std::unique_ptr<Timer> timer_;
 
-  bool window_is_nonzero_ = true;
-  bool retransmit_flag_ = false;
-  bool pre_segment_has_FIN_ = false;
   bool can_use_magic_ = false;
-  bool available_to_send_FIN_ = false;
+  bool window_is_zero_ = false;
   uint16_t remaining_window_size_ = 1;
-  uint64_t absolute_seqno_ = 0; // as checkpoint
+
+  // When timer is expired, set this flag to true.
+  // Set this flag to false after retransmitting the segment.
+  bool retransmit_flag_ = false;
+
+  bool pre_segment_has_FIN_ = false;
+  bool available_to_send_FIN_ = false;
+
+  uint64_t absolute_seqno_ = 0;
   uint64_t pre_unwarped_ackno_ = 0;
 
   size_t next_segment_ = 0;
@@ -103,7 +108,8 @@ public:
   uint64_t consecutive_retransmissions() const; // How many consecutive *re*transmissions have happened?
 
 private:
-  void check_outstanding_segments( uint64_t current_unwraped_ackno );
+  void remove_acked_segment( uint64_t current_unwraped_ackno );
+  void receive_new_ack( uint64_t new_unwraped_ackno );
   bool has_outstanding_segment() const; // sent but unacked
   bool has_cached_segment() const;      // not yet send but usable
 };

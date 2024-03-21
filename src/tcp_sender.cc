@@ -82,9 +82,13 @@ TCPSenderMessage TCPSender::send_empty_message() const
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
   uint64_t current_unwraped_ackno = 0;
+
+  // The msg's ackno field is possibly empty if the receiver hasn't received the isn yet.
   if ( msg.ackno.has_value() ) {
     current_unwraped_ackno = msg.ackno.value().unwrap( isn_, absolute_seqno_ );
   }
+
+  // Receive ack for segment not yet sent
   if ( current_unwraped_ackno > absolute_seqno_ ) {
     return;
   }
@@ -93,29 +97,35 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     available_to_send_FIN_ = msg.window_size + current_unwraped_ackno >= absolute_seqno_;
   }
   remaining_window_size_ = msg.window_size;
-  window_is_nonzero_ = static_cast<bool>( msg.window_size );
-  if ( !window_is_nonzero_ ) {
+  window_is_zero_ = msg.window_size == 0;
+  if ( window_is_zero_ ) {
     can_use_magic_ = true;
   }
 
   if ( pre_unwarped_ackno_ < current_unwraped_ackno ) {
-    timer_->set_RTO_by_factor( 0 );
-    if ( has_outstanding_segment() ) {
-      timer_->restart();
-    }
-    consecutive_retransmissions_ = 0;
-    pre_unwarped_ackno_ = current_unwraped_ackno;
-    check_outstanding_segments( current_unwraped_ackno );
+    receive_new_ack( current_unwraped_ackno );
   }
 }
 
-void TCPSender::check_outstanding_segments( uint64_t current_unwraped_ackno )
+void TCPSender::receive_new_ack( uint64_t new_unwraped_ackno )
+{
+  timer_->set_RTO_by_factor( 0 );
+  if ( has_outstanding_segment() ) {
+    timer_->restart();
+  }
+  consecutive_retransmissions_ = 0;
+  pre_unwarped_ackno_ = new_unwraped_ackno;
+  remove_acked_segment( new_unwraped_ackno );
+}
+
+void TCPSender::remove_acked_segment( uint64_t unwraped_ackno )
 {
   while ( has_outstanding_segment() ) {
-    const auto it = segments_.begin();
-    const uint64_t end_abs_seqno = it->seqno.unwrap( isn_, absolute_seqno_ ) + it->sequence_length();
-    if ( current_unwraped_ackno < end_abs_seqno ) {
-      break;
+    auto it = segments_.cbegin();
+    const uint64_t end_absolute_seqno = it->seqno.unwrap( isn_, absolute_seqno_ ) + it->sequence_length();
+    if ( unwraped_ackno < end_absolute_seqno ) {
+      // This segment hasn't been fully acked yet.
+      return;
     }
     sequence_numbers_in_flight_ -= it->sequence_length();
     segments_.pop_front();
@@ -131,7 +141,7 @@ void TCPSender::tick( uint64_t ms_since_last_tick )
   timer_->elapse( ms_since_last_tick );
   if ( timer_->expired() ) {
     retransmit_flag_ = true;
-    if ( window_is_nonzero_ ) {
+    if ( !window_is_zero_ ) {
       consecutive_retransmissions_ += 1;
       timer_->set_RTO_by_factor( 2 );
     } else {
