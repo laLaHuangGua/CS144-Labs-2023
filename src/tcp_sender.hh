@@ -73,7 +73,6 @@ class TCPSender
   uint64_t absolute_seqno_ = 0; // as checkpoint
   uint64_t pre_unwarped_ackno_ = 0;
 
-  bool no_out_of_win_segment_ = true;
   size_t next_segment_ = 0;
   std::deque<TCPSenderMessage> segments_ {};
 
@@ -105,6 +104,6 @@ public:
 
 private:
   void check_outstanding_segments( uint64_t current_unwraped_ackno );
-  bool no_outstanding_segment() const; // sent but unacked
-  bool no_cached_segment() const;      // not yet send but usable
+  bool has_outstanding_segment() const; // sent but unacked
+  bool has_cached_segment() const;      // not yet send but usable
 };

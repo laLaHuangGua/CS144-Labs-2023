@@ -10,24 +10,14 @@ TCPSender::TCPSender( uint64_t initial_RTO_ms, optional<Wrap32> fixed_isn )
   : isn_( fixed_isn.value_or( Wrap32 { random_device()() } ) ), timer_( make_unique<Timer>( initial_RTO_ms ) )
 {}
 
-uint64_t TCPSender::sequence_numbers_in_flight() const
-{
-  return sequence_numbers_in_flight_;
-}
-
-uint64_t TCPSender::consecutive_retransmissions() const
-{
-  return consecutive_retransmissions_;
-}
-
 optional<TCPSenderMessage> TCPSender::maybe_send()
 {
-  if ( retransmit_flag_ && !no_outstanding_segment() ) {
+  if ( retransmit_flag_ && has_outstanding_segment() ) {
     timer_->run();
     retransmit_flag_ = false;
     return segments_.front();
   }
-  if ( !no_cached_segment() ) {
+  if ( has_cached_segment() ) {
     timer_->run();
     return segments_[next_segment_++];
   }
@@ -110,7 +100,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
   if ( pre_unwarped_ackno_ < current_unwraped_ackno ) {
     timer_->set_RTO_by_factor( 0 );
-    if ( !no_outstanding_segment() ) {
+    if ( has_outstanding_segment() ) {
       timer_->restart();
     }
     consecutive_retransmissions_ = 0;
@@ -121,7 +111,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
 void TCPSender::check_outstanding_segments( uint64_t current_unwraped_ackno )
 {
-  while ( !no_outstanding_segment() ) {
+  while ( has_outstanding_segment() ) {
     const auto it = segments_.begin();
     const uint64_t end_abs_seqno = it->seqno.unwrap( isn_, absolute_seqno_ ) + it->sequence_length();
     if ( current_unwraped_ackno < end_abs_seqno ) {
@@ -135,7 +125,7 @@ void TCPSender::check_outstanding_segments( uint64_t current_unwraped_ackno )
 
 void TCPSender::tick( uint64_t ms_since_last_tick )
 {
-  if ( no_outstanding_segment() && no_cached_segment() ) {
+  if ( !has_outstanding_segment() && !has_cached_segment() ) {
     timer_->stop();
   }
   timer_->elapse( ms_since_last_tick );
@@ -151,15 +141,23 @@ void TCPSender::tick( uint64_t ms_since_last_tick )
   }
 }
 
-bool TCPSender::no_outstanding_segment() const
+bool TCPSender::has_outstanding_segment() const
 {
-  return next_segment_ == 0;
+  return next_segment_ != 0;
 }
 
-bool TCPSender::no_cached_segment() const
+bool TCPSender::has_cached_segment() const
 {
-  if ( no_out_of_win_segment_ ) {
-    return next_segment_ == segments_.size();
-  }
-  return segments_.size() - 1 == next_segment_;
+  return next_segment_ != segments_.size();
+}
+
+// for use in testing
+uint64_t TCPSender::sequence_numbers_in_flight() const
+{
+  return sequence_numbers_in_flight_;
+}
+
+uint64_t TCPSender::consecutive_retransmissions() const
+{
+  return consecutive_retransmissions_;
 }
