@@ -23,15 +23,18 @@ NetworkInterface::NetworkInterface( const EthernetAddress& ethernet_address, con
 void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Address& next_hop )
 {
   if ( const auto it = arp_cache_.find( next_hop.ipv4_numeric() ); it != arp_cache_.end() ) {
+    // The destination Ethernet address is already known
     frames_.emplace( make_frame( it->second.ethernet_address_, EthernetHeader::TYPE_IPv4, serialize( dgram ) ) );
   } else {
     if ( const auto it_dgram = dgrams_.find( next_hop.ipv4_numeric() ); it_dgram != dgrams_.end() ) {
+      // Already sent ARP request about the datagram's dest ip address
       return;
     }
     frames_.emplace(
       make_frame( ETHERNET_BROADCAST,
                   EthernetHeader::TYPE_ARP,
                   serialize( make_arp( ARPMessage::OPCODE_REQUEST, {}, next_hop.ipv4_numeric() ) ) ) );
+    // Queue the datagram
     dgrams_.emplace( next_hop.ipv4_numeric(), DatagramWithTimer { dgram, 0 } );
   }
 }
@@ -39,8 +42,9 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 // frame: the incoming Ethernet frame
 optional<InternetDatagram> NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
-  if ( frame.header.type == EthernetHeader::TYPE_IPv4 and frame.header.dst == ethernet_address_ ) {
+  if ( frame.header.type == EthernetHeader::TYPE_IPv4 && frame.header.dst == ethernet_address_ ) {
     InternetDatagram dgram;
+    // Receive ipv4 datagram, send it to up stack
     if ( parse( dgram, frame.payload ) ) {
       return dgram;
     }
@@ -49,6 +53,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame( const EthernetFrame& fr
   if ( frame.header.type == EthernetHeader::TYPE_ARP ) {
     ARPMessage arp;
     if ( parse( arp, frame.payload ) ) {
+      // Remember the mapping of sender
       arp_cache_.emplace( arp.sender_ip_address, EthernetAddressWithTimer { arp.sender_ethernet_address, 0 } );
       // Send cached dgram
       if ( const auto it = dgrams_.find( arp.sender_ip_address ); it != dgrams_.end() ) {
@@ -57,7 +62,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame( const EthernetFrame& fr
         dgrams_.erase( it );
       }
       // Generate arp reply
-      if ( arp.target_ip_address == ip_address_.ipv4_numeric() and arp.opcode == ARPMessage::OPCODE_REQUEST ) {
+      if ( arp.target_ip_address == ip_address_.ipv4_numeric() && arp.opcode == ARPMessage::OPCODE_REQUEST ) {
         frames_.emplace( make_frame(
           arp.sender_ethernet_address,
           EthernetHeader::TYPE_ARP,
@@ -73,7 +78,7 @@ void NetworkInterface::tick( size_t ms_since_last_tick )
 {
   for ( auto it = arp_cache_.begin(); it != arp_cache_.end(); ) {
     it->second.age_ += ms_since_last_tick;
-    if ( !( it->second.age_ < MAX_LIFE_TIME ) ) {
+    if ( it->second.age_ >= MAX_LIFE_TIME ) {
       it = arp_cache_.erase( it );
     } else {
       ++it;
@@ -81,7 +86,7 @@ void NetworkInterface::tick( size_t ms_since_last_tick )
   }
   for ( auto& dgram : dgrams_ ) {
     dgram.second.time_ += ms_since_last_tick;
-    if ( !( dgram.second.time_ < ARP_MESSAGE_TIMEOUT ) ) {
+    if ( dgram.second.time_ >= ARP_MESSAGE_TIMEOUT ) {
       frames_.emplace( make_frame( ETHERNET_BROADCAST,
                                    EthernetHeader::TYPE_ARP,
                                    serialize( make_arp( ARPMessage::OPCODE_REQUEST, {}, dgram.first ) ) ) );

@@ -37,8 +37,8 @@
 class NetworkInterface
 {
 public:
-  static constexpr size_t MAX_LIFE_TIME = 30000;
-  static constexpr size_t ARP_MESSAGE_TIMEOUT = 5000;
+  static constexpr size_t MAX_LIFE_TIME = 30000;      // in ms
+  static constexpr size_t ARP_MESSAGE_TIMEOUT = 5000; // in ms
 
 private:
   // Ethernet (known as hardware, network-access, or link-layer) address of the interface
@@ -68,7 +68,8 @@ private:
     InternetDatagram dgram_;
     size_t time_;
 
-    DatagramWithTimer( InternetDatagram dgram, size_t time ) : dgram_( std::move( dgram ) ), time_( time ) {}
+    DatagramWithTimer( InternetDatagram dgram, size_t time ) noexcept : dgram_( std::move( dgram ) ), time_( time )
+    {}
   };
   std::unordered_map<uint32_t, DatagramWithTimer> dgrams_ {};
 
