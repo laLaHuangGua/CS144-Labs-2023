@@ -67,7 +67,8 @@ private:
     std::optional<Address> next_hop_;
     size_t interface_num_;
 
-    explicit Route( const uint32_t route_prefix, // Marking route_prefix const to avoid clang-tidy warning
+    // Marking route_prefix const to avoid clang-tidy warning
+    explicit Route( const uint32_t route_prefix,
                     uint8_t prefix_length,
                     std::optional<Address> next_hop,
                     size_t interface_num )
@@ -86,6 +87,7 @@ private:
       return ( res >> offset ) == 0;
     }
   };
+
   std::vector<Route> routes_ {};
 
 public:

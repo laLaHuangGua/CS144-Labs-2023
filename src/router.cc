@@ -31,11 +31,11 @@ void Router::route()
       InternetDatagram dgram = std::move( optional_dgram.value() );
       size_t best = SIZE_MAX;
       for ( size_t i = 0; i < routes_.size(); ++i ) {
-        if ( routes_[i].match( dgram.header.dst ) and ( best == SIZE_MAX or routes_[best] < routes_[i] ) ) {
+        if ( routes_[i].match( dgram.header.dst ) && ( best == SIZE_MAX || routes_[best] < routes_[i] ) ) {
           best = i;
         }
       }
-      if ( best != SIZE_MAX and dgram.header.ttl > 1 ) {
+      if ( best != SIZE_MAX && dgram.header.ttl > 1 ) {
         dgram.header.ttl--;
         dgram.header.compute_checksum();
         Address next_hop = routes_[best].next_hop_.value_or( Address::from_ipv4_numeric( dgram.header.dst ) );
