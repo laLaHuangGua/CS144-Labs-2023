@@ -97,8 +97,8 @@ public:
   void tick( size_t ms_since_last_tick );
 
 private:
-  ARPMessage make_arp( const uint16_t opcode,
-                       const EthernetAddress target_ethernet_address,
-                       const uint32_t target_ip_address_numeric ) const;
-  EthernetFrame make_frame( const EthernetAddress& dst, const uint16_t type, std::vector<Buffer> payload ) const;
+  ARPMessage make_arp( uint16_t opcode,
+                       EthernetAddress target_ethernet_address,
+                       uint32_t target_ip_address_numeric ) const;
+  EthernetFrame make_frame( const EthernetAddress& dst, uint16_t type, std::vector<Buffer> payload ) const;
 };

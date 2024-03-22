@@ -69,7 +69,7 @@ optional<InternetDatagram> NetworkInterface::recv_frame( const EthernetFrame& fr
 }
 
 // ms_since_last_tick: the number of milliseconds since the last call to this method
-void NetworkInterface::tick( const size_t ms_since_last_tick )
+void NetworkInterface::tick( size_t ms_since_last_tick )
 {
   for ( auto it = arp_cache_.begin(); it != arp_cache_.end(); ) {
     it->second.age_ += ms_since_last_tick;
@@ -100,9 +100,9 @@ optional<EthernetFrame> NetworkInterface::maybe_send()
   return {};
 }
 
-ARPMessage NetworkInterface::make_arp( const uint16_t opcode,
-                                       const EthernetAddress target_ethernet_address,
-                                       const uint32_t target_ip_address_numeric ) const
+ARPMessage NetworkInterface::make_arp( uint16_t opcode,
+                                       EthernetAddress target_ethernet_address,
+                                       uint32_t target_ip_address_numeric ) const
 {
   ARPMessage arp;
   arp.opcode = opcode;
@@ -114,7 +114,7 @@ ARPMessage NetworkInterface::make_arp( const uint16_t opcode,
 }
 
 EthernetFrame NetworkInterface::make_frame( const EthernetAddress& dst,
-                                            const uint16_t type,
+                                            uint16_t type,
                                             vector<Buffer> payload ) const
 {
   EthernetFrame frame;
