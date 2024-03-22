@@ -38,10 +38,7 @@ void Router::route()
       if ( best != SIZE_MAX and dgram.header.ttl > 1 ) {
         dgram.header.ttl--;
         dgram.header.compute_checksum();
-        Address next_hop = Address::from_ipv4_numeric( dgram.header.dst );
-        if ( routes_[best].next_hop_.has_value() ) {
-          next_hop = routes_[best].next_hop_.value();
-        }
+        Address next_hop = routes_[best].next_hop_.value_or( Address::from_ipv4_numeric( dgram.header.dst ) );
         interface( routes_[best].interface_num_ ).send_datagram( dgram, next_hop );
       }
       optional_dgram = inf.maybe_receive();

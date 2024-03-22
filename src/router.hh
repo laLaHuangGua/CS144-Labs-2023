@@ -67,22 +67,23 @@ private:
     std::optional<Address> next_hop_;
     size_t interface_num_;
 
-    explicit Route( uint32_t route_prefix,
+    explicit Route( const uint32_t route_prefix, // Marking route_prefix const to avoid clang-tidy warning
                     uint8_t prefix_length,
                     std::optional<Address> next_hop,
                     size_t interface_num )
       : route_prefix_( route_prefix )
       , prefix_length_( prefix_length )
-      , next_hop_( std::move( next_hop ) )
+      , next_hop_( next_hop )
       , interface_num_( interface_num )
     {}
 
-    bool operator<( const Route& rhs ) { return this->prefix_length_ < rhs.prefix_length_; }
+    bool operator<( const Route& rhs ) const { return this->prefix_length_ < rhs.prefix_length_; }
 
     bool match( uint32_t other_ip_address ) const
     {
-      uint64_t res = ( route_prefix_ ^ other_ip_address );
-      return ( res >> ( MAX_IP_ADDR_LEN - prefix_length_ ) ) == 0;
+      uint64_t res = route_prefix_ ^ other_ip_address;
+      uint8_t offset = MAX_IP_ADDR_LEN - prefix_length_;
+      return ( res >> offset ) == 0;
     }
   };
   std::vector<Route> routes_ {};
